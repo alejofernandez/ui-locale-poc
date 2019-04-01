@@ -1,21 +1,26 @@
 const { pick, parse } = require('accept-language-parser');
 
-function pickLocale(supported, uiLocales, accepted) {
+function pickLocale(supported, uiLocales, accepted, defaultLocale) {
   const supportedParsed = supported.map(l => parse(l)[0]).filter(l => l);
   const uiLocalesParsed = uiLocales.map(l => parse(l)[0]).filter(l => l);
 
   // filter supported languages list with the requested ui-locales
-  const supportedUiLocales = supportedParsed
-    .filter(supported => uiLocalesParsed
-      .some(uiLocale => uiLocale.code === supported.code)
-    );
+  const supportedUiLocales = uiLocalesParsed
+    .filter(uiLocale => supportedParsed
+      .some(supported => supported.code === uiLocale.code)
+    )
+    // we only pick the country, but we may want to support country/region in the future
+    .map(({code}) => code);
 
-  // build the final list of locales to check against accepted
-  const checkAgainstAccepted = (supportedUiLocales.length ? supportedUiLocales : supportedParsed)
-    .map(({code, region}) => region ? `${code}-${region}` : code);
+  // if there are no matches between supported and ui_locales we use supported
+  const supportedToCheck = supportedUiLocales.length ?
+    supportedUiLocales : supported;
 
   // check supported/ui-locales list against accepted
-  return pick(checkAgainstAccepted, accepted) || checkAgainstAccepted[0];
+  const foundAccepted = supportedToCheck.length && accepted ?
+    pick(supportedToCheck, accepted, { loose: true }) : null;
+
+  return foundAccepted || supportedUiLocales[0] || defaultLocale || 'en';
 }
 
 module.exports = {
